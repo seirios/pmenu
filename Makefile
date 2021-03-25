@@ -16,9 +16,13 @@ ${OBJS}: ${PROG}.h config.h
 clean:
 	-rm ${OBJS} ${PROG}
 
-install: all
-	mkdir -p ${DESTDIR}${PREFIX}/bin
-	install -m 755 ${PROG} ${DESTDIR}${PREFIX}/bin/${PROG}
+install: install-bin install-man
+
+install-bin: all
+	mkdir -p ${DESTDIR}${PREFIX}/${BINDIR}
+	install -m 755 ${PROG} ${DESTDIR}${PREFIX}/${BINDIR}/${PROG}
+
+install-man:
 	mkdir -p ${DESTDIR}${MANPREFIX}/man1
 	install -m 644 ${PROG}.1 ${DESTDIR}${MANPREFIX}/man1/${PROG}.1
 

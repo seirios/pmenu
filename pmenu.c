@@ -219,6 +219,7 @@ initpie(void)
 	/* set the separator beginning and end */
 	pie.separatorbeg = pie.radius * config.separatorbeg;
 	pie.separatorend = pie.radius * config.separatorend;
+    pie.centerdiskradius = (pie.radius + 1) * config.centerdiskradius;
 	pie.innerangle = atan(config.separator_pixels / (2.0 * pie.separatorbeg));
 	pie.outerangle = atan(config.separator_pixels / (2.0 * pie.separatorend));
 
@@ -786,33 +787,40 @@ placemenu(struct Menu *menu)
 	int x, y;   /* position of the center of the menu */
 	Bool ret;
 
-	if (menu->parent == NULL) {
+	/*if (menu->parent == NULL) {*/
 		x = mon.cursx;
 		y = mon.cursy;
-	} else {
-		ret = XTranslateCoordinates(dpy, menu->parent->win, rootwin,
-		                            menu->caller->x, menu->caller->y,
-		                            &x, &y, &w1);
-		if (ret == False)
-			errx(EXIT_FAILURE, "menus are on different screens");
-	}
-	menu->x = mon.x;
-	menu->y = mon.y;
+	/*} else {*/
+		/*ret = XTranslateCoordinates(dpy, menu->parent->win, rootwin,*/
+									/*menu->caller->x, menu->caller->y,*/
+									/*&x, &y, &w1);*/
+		/*if (ret == False)*/
+			/*errx(EXIT_FAILURE, "menus are on different screens");*/
+	/*}*/
+	menu->x = mon.x; /* origin of monitor */
+	menu->y = mon.y; /* origin of monitor */
 	if (x - mon.x >= pie.radius) {
-		if (mon.x + mon.w - x >= pie.radius)
+		if (mon.x + mon.w - x >= pie.radius) {
 			menu->x = x - pie.radius - pie.border;
-		else if (mon.x + mon.w >= pie.fulldiameter)
-			menu->x = mon.x + mon.w - pie.fulldiameter;
+        }
+		else if (mon.x + mon.w >= pie.fulldiameter) {
+			menu->x = mon.x + mon.w - pie.fulldiameter - 1;
+        }
 	}
 	if (y - mon.y >= pie.radius) {
-		if (mon.y + mon.h - y >= pie.radius)
-			menu->y = y - pie.radius - pie.border;
-		else if (mon.y + mon.h >= pie.fulldiameter)
+		if (mon.y + mon.h - y >= pie.radius) {
+			menu->y = y - pie.radius - pie.border + 1;
+        }
+		else if (mon.y + mon.h >= pie.fulldiameter) {
 			menu->y = mon.y + mon.h - pie.fulldiameter;
+        }
 	}
 	changes.x = menu->x;
 	changes.y = menu->y;
 	XConfigureWindow(dpy, menu->win, CWX | CWY, &changes);
+    if(menu->parent == NULL) {
+        XWarpPointer(dpy, None, menu->win, 0, 0, 0, 0, pie.radius, pie.radius);
+    }
 	for (slice = menu->list; slice != NULL; slice = slice->next) {
 		if (slice->submenu != NULL) {
 			placemenu(slice->submenu);
@@ -848,9 +856,9 @@ getslice(struct Menu *menu, int x, int y)
 	y -= pie.radius;
 	y = -y;
 
-	/* if the cursor is in the middle circle, it is in no slice */
+	/* if the cursor is in the middle disk, it is in no slice */
 	r = sqrt(x * x + y * y);
-	if (r <= pie.separatorbeg)
+	if (r <= pie.centerdiskradius)
 		return NULL;
 
 	angle = atan2(y, x);
@@ -939,12 +947,13 @@ drawslice(struct Menu *menu, struct Slice *slice)
 	double h, a, b;
 
 	/* determine number of segments to draw */
-	h = hypot(pie.radius, pie.radius)/2;
-	outer = ((2 * M_PI) / (menu->nslices * acos(h/(h+1.0)))) + 0.5;
-	outer = (outer < 3) ? 3 : outer;
-	h = hypot(pie.separatorbeg, pie.separatorbeg)/2;
-	inner = ((2 * M_PI) / (menu->nslices * acos(h/(h+1.0)))) + 0.5;
-	inner = (inner < 3) ? 3 : inner;
+	/*h = hypot(pie.radius, pie.radius)/2;*/
+	/*outer = ((2 * M_PI) / (menu->nslices * acos(h/(h+1.0)))) + 0.5;*/
+	/*outer = (outer < 3) ? 3 : outer;*/
+	/*h = hypot(pie.centerdiskradius, pie.centerdiskradius)/2;*/
+	/*inner = ((2 * M_PI) / (menu->nslices * acos(h/(h+1.0)))) + 0.5;*/
+	/*inner = (inner < 3) ? 3 : inner;*/
+    outer = inner = 360;
 	npoints = inner + outer + 2;
 	p = emalloc(npoints * sizeof *p);
 
@@ -960,8 +969,8 @@ drawslice(struct Menu *menu, struct Slice *slice)
 	/* inner points */
 	a = ((2 * M_PI) / (menu->nslices * inner));
 	for (i = 0; i <= inner; i++) {
-		p[i + outer + 1].x = pie.radius + pie.separatorbeg * cos(((inner - i) - (inner / 2.0)) * a - b);
-		p[i + outer + 1].y = pie.radius + pie.separatorbeg * sin(((inner - i) - (inner / 2.0)) * a - b);
+		p[i + outer + 1].x = pie.radius + pie.centerdiskradius * cos(((inner - i) - (inner / 2.0)) * a - b);
+		p[i + outer + 1].y = pie.radius + pie.centerdiskradius * sin(((inner - i) - (inner / 2.0)) * a - b);
 	}
 	
 	XRenderCompositeDoublePoly(dpy, PictOpOver, pie.selbg, slice->picture,
@@ -1038,6 +1047,11 @@ drawmenu(struct Menu *menu, struct Slice *selected)
 	if (selected)
 		drawslice(menu, selected);
 
+    /* draw center disk */
+    XSetForeground(dpy, dc.gc, dc.border.pixel);
+    XFillArc(dpy, pixmap, dc.gc, pie.radius - pie.centerdiskradius - 1, pie.radius - pie.centerdiskradius - 1,
+            2 * pie.centerdiskradius + 1, 2 * pie.centerdiskradius + 1, 0, 360*64);
+
 	/* draw slice foreground */
 	for (slice = menu->list; slice; slice = slice->next) {
 		if (slice == selected) {
@@ -1061,13 +1075,27 @@ drawmenu(struct Menu *menu, struct Slice *selected)
 		}
 
 		/* draw separator */
-		drawseparator(picture, menu, slice);
+		XSetForeground(dpy, dc.gc, dc.separator.pixel);
+	    double a = -((M_PI + 2 * M_PI * slice->slicen) / menu->nslices);
+        int linexi = pie.radius + pie.separatorbeg * cos(a);
+        int lineyi = pie.radius + pie.separatorbeg * sin(a);
+        int linexo = pie.radius + pie.separatorend * cos(a);
+        int lineyo = pie.radius + pie.separatorend * sin(a);
+        if (abs(linexo - linexi) <= 2) linexo = linexi;
+		XDrawLine(dpy, pixmap, dc.gc, linexi, lineyi, linexo, lineyo);
 
 		/* draw triangle */
 		if (slice->submenu && tflag) {
 			drawtriangle(source, picture, menu, slice);
 		}
 	}
+
+    /* draw inner border */
+    if(pie.border > 0) {
+        XSetForeground(dpy, dc.gc, dc.border.pixel);
+        XDrawArc(dpy, pixmap, dc.gc, pie.radius - pie.centerdiskradius, pie.radius - pie.centerdiskradius,
+               2 * pie.centerdiskradius, 2 * pie.centerdiskradius, 0, 360*64);
+    }
 }
 
 /* draw slices of the current menu and of its ancestors */
@@ -1165,12 +1193,10 @@ run(struct Menu *rootmenu)
 			menu = getmenu(currmenu, ev.xcrossing.window);
 			if (menu == NULL)
 				break;
-			if (menu != rootmenu && menu == currmenu) {
-				currmenu = currmenu->parent;
-				prevmenu = mapmenu(currmenu, prevmenu);
-			}
-			currmenu->selected = NULL;
-			copymenu(currmenu);
+			if ((menu != rootmenu && menu == currmenu)
+                   || (menu == rootmenu && currmenu == rootmenu)) {
+                goto done;
+            }
 			break;
 		case MotionNotify:
 			menu = getmenu(currmenu, ev.xbutton.window);
@@ -1179,8 +1205,11 @@ run(struct Menu *rootmenu)
 				break;
 			else if (slice == NULL)
 				menu->selected = NULL;
-			else
+			else {
 				menu->selected = slice;
+                /*if (slice->submenu)*/
+                    /*goto selectslice;*/
+            }
 			copymenu(currmenu);
 			break;
 		case ButtonRelease:
@@ -1199,14 +1228,24 @@ selectslice:
 			prevmenu = mapmenu(currmenu, prevmenu);
 			currmenu->selected = NULL;
 			copymenu(currmenu);
-			if (!wflag)
-				XWarpPointer(dpy, None, currmenu->win, 0, 0, 0, 0, pie.radius, pie.radius);
+            if (!wflag)
+                XWarpPointer(dpy, None, currmenu->win, 0, 0, 0, 0, pie.radius, pie.radius);
 			break;
 		case ButtonPress:
-			menu = getmenu(currmenu, ev.xbutton.window);
-			slice = getslice(menu, ev.xbutton.x, ev.xbutton.y);
-			if (menu == NULL || slice == NULL)
-				goto done;
+            menu = getmenu(currmenu, ev.xbutton.window);
+            slice = getslice(menu, ev.xbutton.x, ev.xbutton.y);
+            if (menu == NULL)
+                goto done;
+            else if (slice == NULL) {
+                if(menu == rootmenu)
+                    goto done;
+                else {
+                    currmenu = currmenu->parent;
+                    prevmenu = mapmenu(currmenu, prevmenu);
+                    currmenu->selected = NULL;
+                    copymenu(currmenu);
+                }
+            }
 			break;
 		case KeyPress:
 			ksym = XkbKeycodeToKeysym(dpy, ev.xkey.keycode, 0, 0);

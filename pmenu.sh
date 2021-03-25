@@ -1,6 +1,8 @@
 #!/bin/sh
 
-cat <<EOF | pmenu | sh &
+PMENU=$HOME/src/pmenu/pmenu
+
+cat <<EOF | $PMENU | sh &
 Browser		firefox
 xterm		xterm
 urxvt		urxvt

@@ -26,6 +26,7 @@ struct Config {
 	unsigned diameter_pixels;
 	double separatorbeg;
 	double separatorend;
+    double centerdiskradius;
 };
 
 /* draw context structure */
@@ -105,6 +106,7 @@ struct Pie {
 	int triangleouter;
 	int separatorbeg;
 	int separatorend;
+    int centerdiskradius;
 	double triangleangle;
 	double innerangle;
 	double outerangle;
