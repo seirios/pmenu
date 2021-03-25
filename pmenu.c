@@ -1082,6 +1082,7 @@ drawmenu(struct Menu *menu, struct Slice *selected)
         int linexo = pie.radius + pie.separatorend * cos(a);
         int lineyo = pie.radius + pie.separatorend * sin(a);
         if (abs(linexo - linexi) <= 2) linexo = linexi;
+        if (abs(lineyo - lineyi) <= 2) lineyo = lineyi;
 		XDrawLine(dpy, pixmap, dc.gc, linexi, lineyi, linexo, lineyo);
 
 		/* draw triangle */

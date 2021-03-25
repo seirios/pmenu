@@ -3,7 +3,7 @@ PROG = pmenu
 
 # paths
 PREFIX = ${HOME}
-BINDIR = .bin
+BINDIR = bin
 MANPREFIX = ${PREFIX}/share/man
 
 LOCALINC = /usr/local/include
